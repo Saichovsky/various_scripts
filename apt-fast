@@ -1,0 +1,24 @@
+#!/bin/sh
+# Simple apt-fast implementation using axel
+
+[ -x "$(command -v axel)" ] ||
+  (
+    echo "Preparing $(basename $0) for first-time run..."
+    (
+      apt-get update >/dev/null
+      apt-get install axel -y --force-yes
+    ) >/dev/null 2>&1
+  )
+
+if echo "$@" | egrep -wq "upgrade|install|dist-upgrade"; then
+  echo "Working..."
+  cd /var/cache/apt/archives/
+  apt-get -y --print-uris $@ | egrep -o -e "(ht|f)tps?://[^\']+" >apt-fast.list
+  cat apt-fast.list | xargs -r -l1 axel -a -n10
+  apt-get $@
+  cd - >/dev/null
+  printf "\nDone! Verify that all packages were installed successfully. "
+  printf "If errors are found, run apt-get clean as root and try again using apt-get directly.\n"
+else
+  apt-get $@
+fi

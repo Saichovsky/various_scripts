@@ -1,0 +1,22 @@
+#!/bin/sh
+# Used to view gekko logs both on the shell and using CGI online
+
+BOTDIR=/var/www/gekko
+cd $BOTDIR || true
+logfile="$(ls -t logs/*trade*.log | head -1)"
+
+forweb() {
+  [ "$(readlink /proc/$PPID/exe | xargs basename)" = "fcgiwrap" ]
+}
+
+showlogs() {
+  tail -n 1000 $@ $logfile |
+    grep -Ev 'entering "(setBalance|(get|set|check|cancel)Order)|was not|getTicker|\(addOrder\)' |
+    awk '$3 ~/:/ {gsub(".*","-",$3); print}'
+}
+
+if forweb; then
+  printf "Content-type: text/plain\n"
+  showlogs $@ | tac else
+  showlogs $@
+fi

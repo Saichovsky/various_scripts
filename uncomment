@@ -1,0 +1,8 @@
+#!/bin/sh
+# View text files sans comments
+
+[ -r $1 ] && egrep -v "^\s*(#.*)?$" $1 ||
+  (
+    echo "Error reading $1" >&2
+    exit 2
+  )
