@@ -17,6 +17,7 @@ showlogs() {
 
 if forweb; then
   printf "Content-type: text/plain\n"
-  showlogs $@ | tac else
+  showlogs $@ | tac
+else
   showlogs $@
 fi
