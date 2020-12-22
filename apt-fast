@@ -1,24 +1,36 @@
 #!/bin/sh
-# Simple apt-fast implementation using axel
 
-[ -x "$(command -v axel)" ] ||
-  (
-    echo "Preparing $(basename $0) for first-time run..."
-    (
-      apt-get update >/dev/null
-      apt-get install axel -y --force-yes
-    ) >/dev/null 2>&1
-  )
+ARCHDIR=/var/cache/apt/archives
+ARCHLIST=${ARCHDIR}/apt-fast_$$.list
 
-if echo "$@" | egrep -wq "upgrade|install|dist-upgrade"; then
-  echo "Working..."
-  cd /var/cache/apt/archives/
-  apt-get -y --print-uris $@ | egrep -o -e "(ht|f)tps?://[^\']+" >apt-fast.list
-  cat apt-fast.list | xargs -r -l1 axel -a -n10
-  apt-get $@
-  cd - >/dev/null
-  printf "\nDone! Verify that all packages were installed successfully. "
-  printf "If errors are found, run apt-get clean as root and try again using apt-get directly.\n"
+# test if the aria2 is installed
+if [ ! -x /usr/bin/aria2c ];
+then echo "aria2 is not installed, perform this?(y/n)"
+    read ops
+    case $ops in
+         y) if apt-get install aria2 -y --force-yes
+               then echo "aria2 installed"
+               else echo "unable to install the aria2. you are using sudo?" ; exit
+           fi ;;
+         n) echo "not possible usage apt-fast" ; exit ;;
+    esac
+fi
+
+# If the user entered arguments contain upgrade, install, or dist-upgrade
+if echo "$@" | grep -q "upgrade\|install\|dist-upgrade"; then
+  echo "Working...";
+
+  # Have apt-get print the information, including the URI's to the packages
+  # Strip out the URI's, and download the packages with aria2 for speediness
+  # I found this regex elsewhere, showing how to manually strip package URI's you may need...thanks to whoever wrote it
+  apt-get -y --print-uris $@ | egrep -o -e "(ht|f)tps?://[^\']+" > ${ARCHLIST} && cat ${ARCHLIST} | xargs -l1 aria2c -d ${ARCHDIR}
+  rm ${ARCHLIST}
+
+  # Perform the user's requested action via apt-get
+  apt-get $@;
+
+  echo -e "\nDone! Verify that all packages were installed successfully. If errors are found, run apt-get clean as root and try again using apt-get directly.\n";
+
 else
-  apt-get $@
+   apt-get $@;
 fi
