@@ -1,13 +1,11 @@
 #!/bin/bash
 # Place this in /etc/cron.daily for daily updates
+LIST=eng.m3u
 cd /tmp
-printf "Updating repo... "
-curl -sLJO https://github.com/iptv-org/iptv/raw/master/channels/us.m3u
-curl -sLJO https://github.com/iptv-org/iptv/raw/master/channels/uk.m3u
-printf "done!\nMerging lists... "
-cat us.m3u uk.m3u >eng.m3u
+printf "Updating lists... "
+curl -sL https://github.com/iptv-org/iptv/raw/master/channels/u{s,k}.m3u >${LIST}
 # Remove header from second file and sanitize content
-L2=$(awk '/EXTM3U/ {if(NR !=1) print NR}' eng.m3u)
-sed -i "s/^#EXTM3U.*/#EXTM3U/; ${L2}d; /XXX/ {N; d;}" eng.m3u
-mv eng.m3u /var/www/iptv/stream/ && rm *.m3u
+L2=$(awk '/EXTM3U/ {if(NR !=1) print NR}' ${LIST})
+sed -i "s/^#EXTM3U.*/#EXTM3U/; ${L2}d; /XXX/I {N; d;}" ${LIST}
+mv ${LIST} /var/www/iptv/stream/
 echo "done!"
