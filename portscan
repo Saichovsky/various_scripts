@@ -2,8 +2,8 @@
 if [[ ! -z $1 && $1 == *:* ]]; then
   set $(echo $1 | sed 's/:/ /')
 elif [[ -z $1 || -z $2 ]]; then
-    echo "Usage: $0 <host> <port, ports, or port-range> OR <host>:<port>"
-    exit 1
+  echo "Usage: $0 <host> <port, ports, or port-range> OR <host>:<port>"
+  exit 1
 fi
 
 Red='\e[0;31m'
@@ -13,31 +13,39 @@ RCol='\e[0m'
 host=$1
 ports=()
 
+if [ "$(uname)" = "Darwin" ]; then
+  TIMEOUTCMD=gtimeout
+fi
+
 case $1 in
-    *:*)
-       IFS=: read  host port <<< "$1"
-       ports+=($port)
-       ;;
-    *)
-       host=$1
+*:*)
+  IFS=: read host port <<<"$1"
+  ports+=($port)
+  ;;
+*)
+  host=$1
+  ;;
 esac
 
 case $2 in
-    *-*)
-        IFS=- read start end <<< "$2"
-        for ((port=start; port <= end; port++)); do
-            ports+=($port)
-        done
-        ;;
-    *,*)
-        IFS=, read -ra ports <<< "$2"
-        ;;
-    *)
-        ports+=($2)
-        ;;
+*-*)
+  IFS=- read start end <<<"$2"
+  for ((port = start; port <= end; port++)); do
+    ports+=($port)
+  done
+  ;;
+*,*)
+  IFS=, read -ra ports <<<"$2"
+  ;;
+*)
+  ports+=($2)
+  ;;
 esac
 
 for port in "${ports[@]}"; do
-    timeout 1 bash -c "echo >/dev/tcp/$host/$port" > /dev/null 2>&1 \
-        && echo -e "$host: port $port is ${Gre}open${RCol}" || (echo -e "$host: port $port is ${Red}closed${RCol}"; exit 2)
+  ${TIMEOUTCMD} 1 bash -c "echo >/dev/tcp/$host/$port" >/dev/null 2>&1 &&
+    echo -e "$host: port $port is ${Gre}open${RCol}" || (
+    echo -e "$host: port $port is ${Red}closed${RCol}"
+    exit 2
+  )
 done
