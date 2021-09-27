@@ -3,7 +3,7 @@
 ARCHDIR=/var/cache/apt/archives
 ARCHLIST=${ARCHDIR}/apt-fast_$$.list
 
-# test if the aria2 is installed
+# test if aria2 is installed
 if [ ! -x /usr/bin/aria2c ];
 then echo "aria2 is not installed, perform this?(y/n)"
     read ops
@@ -23,8 +23,7 @@ if echo "$@" | grep -q "upgrade\|install\|dist-upgrade"; then
   # Have apt-get print the information, including the URI's to the packages
   # Strip out the URI's, and download the packages with aria2 for speediness
   # I found this regex elsewhere, showing how to manually strip package URI's you may need...thanks to whoever wrote it
-  apt-get -y --print-uris $@ | egrep -o -e "(ht|f)tps?://[^\']+" > ${ARCHLIST} && cat ${ARCHLIST} | xargs -l1 aria2c -d ${ARCHDIR}
-  rm ${ARCHLIST}
+  apt-get -y --print-uris $@ | grep -Po "(ht|f)tps?://[^\']+" > ${ARCHLIST} && aria2c -i ${ARCHLIST} -d ${ARCHDIR}
 
   # Perform the user's requested action via apt-get
   apt-get $@;
@@ -34,3 +33,6 @@ if echo "$@" | grep -q "upgrade\|install\|dist-upgrade"; then
 else
    apt-get $@;
 fi
+# Clean up
+apt-get clean
+rm ${ARCHLIST}
