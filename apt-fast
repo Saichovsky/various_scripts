@@ -35,4 +35,4 @@ else
 fi
 # Clean up
 apt-get clean
-rm ${ARCHLIST}
+rm ${ARCHLIST} 2>/dev/null || true
