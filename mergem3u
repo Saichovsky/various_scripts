@@ -4,9 +4,9 @@ LIST=eng.m3u
 LISTDIR=/var/www/iptv/stream
 cd /tmp
 printf "Updating lists... "
-curl -sL https://github.com/iptv-org/iptv/raw/master/channels/u{s,k}.m3u >${LIST}
+curl -sL https://raw.githubusercontent.com/iptv-org/iptv/master/streams/u{s,k}.m3u >${LIST}
 # Remove header from second file and sanitize content
 L2=$(awk '/EXTM3U/ {if(NR !=1) print NR}' ${LIST})
-sed -i "s/^#EXTM3U.*/#EXTM3U/; ${L2}d; /XXX/I {N; d;}" ${LIST}
+sed -i "s/^#EXTM3U.*/#EXTM3U/; ${L2}d; /^#EXTINF.*XXX/I {N; d;}" ${LIST}
 mv ${LIST} ${LISTDIR}/
 echo "done!"
