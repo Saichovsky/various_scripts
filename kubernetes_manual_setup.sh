@@ -11,6 +11,11 @@ if ! grep -Ewq 'ID=(debian|ubuntu)' /etc/os-release; then
   exit 1
 fi
 
+if [ -f /run/.kube_setup ]; then
+  echo "Kubernetes components are already installed on this system"
+  exit 1
+fi
+
 apt-get update && apt-get install -y jq apt-transport-https curl
 
 curl -s https://pastebin.com/raw/v2BtJJC0 | dos2unix >/usr/local/bin/apt-fast
@@ -90,6 +95,7 @@ apt-mark hold kubelet kubeadm kubectl
 swapoff -a && sed -i '/swap/ s/^/#/' /etc/fstab
 
 crictl config --set runtime-endpoint=unix:///run/containerd/containerd.sock
+touch /run/.kube_setup
 
 echo "Installing k9s..."
 curl -s https://pastebin.com/raw/KsYgLfYw | dos2unix | bash
