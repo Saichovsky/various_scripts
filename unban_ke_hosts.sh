@@ -10,7 +10,7 @@ for jail in $JAILS; do
   for IP in $IPS; do
     ((ALL_IPS++))
     C=$(curl -s "https://ipapi.co/${IP}/json" | jq -r '.country_code')
-    [ "$C" = "KE" ] && {
+    [[ "$C" = "KE" ]] && {
       fail2ban-client set "$jail" unbanip "$IP"
       echo "Found $IP..." | logger -t unban
       ((FOUND_IPS++))
