@@ -15,7 +15,14 @@ ports=()
 
 if [ "$(uname)" = "Darwin" ]; then
   TIMEOUTCMD=gtimeout
+else
+  TIMEOUTCMD=timeout
 fi
+
+command -v $TIMEOUTCMD >/dev/null 2>&1 || {
+  echo "Error: $TIMEOUTCMD not found"
+  exit 1
+}
 
 case $1 in
 *:*)
