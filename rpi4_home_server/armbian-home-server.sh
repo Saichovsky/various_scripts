@@ -75,9 +75,9 @@ chmod 644 /etc/apt/sources.list.d/{docker,kubernetes}.list
 apt-get update && apt-fast install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin kubectl
 
 # Install kubectx and kubens
-RELEASE_STRING="$(uname | tr 'A-Z' 'a-z')-$(dpkg --print-architecture)"
+RELEASE_STRING="$(uname | tr 'A-Z' 'a-z')_$(arch | sed 's/aarch64/arm64/')"
 curl -s 'https://api.github.com/repos/ahmetb/kubectx/releases/latest' |
-  jq -r --arg rel "${RELEASE_STRING/-/_}" '.assets[].browser_download_url | select(contains($rel))' |
+  jq -r --arg rel "${RELEASE_STRING}" '.assets[].browser_download_url | select(contains($rel))' |
   aria2c --allow-overwrite=true -i-
 find . -maxdepth 1 -type f -name "kube*.tar.gz" -exec tar xvzf {} --exclude=LICENSE -C /usr/local/bin/ \; &&
   rm -fr kube*.tar.gz
@@ -88,6 +88,7 @@ curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
 
 # Install and set up kind
 echo "Installing kind..."
+RELEASE_STRING="$(uname | tr 'A-Z' 'a-z')-$(dpkg --print-architecture)"
 KIND_LATEST=$(curl -s 'https://api.github.com/repos/kubernetes-sigs/kind/releases/latest' | jq -r '.tag_name')
 KIND_LOCAL=/usr/local/bin/kind
 curl -Lo "${KIND_LOCAL}" "https://kind.sigs.k8s.io/dl/${KIND_LATEST}/kind-${RELEASE_STRING}"
