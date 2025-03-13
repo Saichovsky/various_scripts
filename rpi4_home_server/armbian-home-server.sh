@@ -94,18 +94,64 @@ KIND_LOCAL=/usr/local/bin/kind
 curl -Lo "${KIND_LOCAL}" "https://kind.sigs.k8s.io/dl/${KIND_LATEST}/kind-${RELEASE_STRING}"
 chmod +x "${KIND_LOCAL}"
 
-# Set up kind cluster
+# Set up the kind cluster
 echo "Setting up kind cluster..."
+mkdir -p /data/kind-storage
 cat <<EOF | kind create cluster --config=-
 kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
 name: home-cluster
 nodes:
 - role: control-plane
+  extraMounts:
+  - hostPath: /data/kind-storage
+    containerPath: /data
 - role: worker
+  extraMounts:
+  - hostPath: /data/kind-storage
+    containerPath: /data
 - role: worker
+  extraMounts:
+  - hostPath: /data/kind-storage
+    containerPath: /data
 EOF
 
+cat <<EOF | kubectl apply -f-
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: shared-pv
+  labels:
+    type: local
+spec:
+  accessModes:
+    - ReadWriteMany
+  capacity:
+    storage: 3Gi
+  storageClassName: shared-storage
+  persistentVolumeReclaimPolicy: Retain
+  hostPath:
+    path: "/data/"
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: node-role.kubernetes.io/control-plane
+          operator: DoesNotExist
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: shared-pvc
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 3Gi
+  storageClassName: shared-storage
+EOF
 # Use helm to install home assistant and pi-hole
 # helm repo add home-assistant https://amcgeek.github.io/home-assistant-helm
 # helm repo add pi-hole https://pi-hole.github.io/
