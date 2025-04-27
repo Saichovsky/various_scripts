@@ -4,7 +4,7 @@
 
 # Update these as per your web server configuration
 LIST=eng.m3u
-LISTDIR=/var/www/iptv/stream
+LISTDIR=/home/saichovsky/.iptv
 
 cd /tmp
 printf "Updating lists... "
