@@ -69,6 +69,9 @@ EOF
   sed -i "s/$OLD_HOSTNAME/$NEW_HOSTNAME/g" /etc/hosts
 }
 
+# Enable NTP client
+sed -i 's/^#NTP=$/NTP=ke.pool.ntp.org/' /etc/systemd/timesyncd.conf
+
 # Install required tools and packages
 yes | apt-fast install -y ca-certificates apt-transport-https gnupg git jq yq fzf
 test -d /etc/apt/keyrings || install -m 0755 -d /etc/apt/keyrings
