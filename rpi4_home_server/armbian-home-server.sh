@@ -70,7 +70,31 @@ EOF
 }
 
 # Enable NTP client
-sed -i 's/^#NTP=$/NTP=ke.pool.ntp.org/' /etc/systemd/timesyncd.conf
+[[ "$RERUN" == "1" ]] || sed -i 's/^#NTP=$/NTP=ke.pool.ntp.org/' /etc/systemd/timesyncd.conf
+
+# Update /etc/issue with the host IP for ease of identification for SSH access
+[ ! -f /usr/local/bin/update-issue.sh ] &&
+  {
+    curl -s https://pastebin.com/raw/tEHerNef | tr -d '\r' >/usr/local/bin/update-issue.sh &&
+      chmod 755 /usr/local/bin/update-issue.sh
+
+    # Install update-issue script as a systemd service
+    cat <<EOF >/etc/systemd/systemd/update-issue.service
+[Unit]
+Description=Update /etc/issue with host IP address
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/update-issue.sh
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+    systemctl daemon-reload
+  }
 
 # Install required tools and packages
 yes | apt-fast install -y ca-certificates apt-transport-https gnupg git jq yq fzf
@@ -100,6 +124,9 @@ curl -s 'https://api.github.com/repos/ahmetb/kubectx/releases/latest' |
   aria2c --allow-overwrite=true -i-
 find . -maxdepth 1 -type f -name "kube*.tar.gz" -exec tar xvzf {} --exclude=LICENSE -C /usr/local/bin/ \; &&
   rm -fr kube*.tar.gz
+
+# Install kubectl-ai
+curl -sSL https://raw.githubusercontent.com/GoogleCloudPlatform/kubectl-ai/main/install.sh | bash
 
 # Install helm
 echo "Installing helm..."
