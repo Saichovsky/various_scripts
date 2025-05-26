@@ -93,7 +93,7 @@ ExecStart=/usr/local/bin/update-issue.sh
 WantedBy=multi-user.target
 EOF
 
-    systemctl daemon-reload
+    systemctl enable update-issue && systemctl daemon-reload
   }
 
 # Install required tools and packages
