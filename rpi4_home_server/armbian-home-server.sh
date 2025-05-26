@@ -79,7 +79,7 @@ EOF
       chmod 755 /usr/local/bin/update-issue.sh
 
     # Install update-issue script as a systemd service
-    cat <<EOF >/etc/systemd/systemd/update-issue.service
+    cat <<EOF >/etc/systemd/system/update-issue.service
 [Unit]
 Description=Update /etc/issue with host IP address
 After=network-online.target
