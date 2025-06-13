@@ -1,38 +1,42 @@
-#!/bin/sh
+#!/bin/bash
 
+set -eu
 ARCHDIR=/var/cache/apt/archives
 ARCHLIST=${ARCHDIR}/apt-fast_$$.list
 
-# test if aria2 is installed
-if [ ! -x /usr/bin/aria2c ];
-then echo "aria2 is not installed, perform this?(y/n)"
-    read ops
-    case $ops in
-         y) if apt-get install aria2 -y --force-yes
-               then echo "aria2 installed"
-               else echo "unable to install the aria2. you are using sudo?" ; exit
-           fi ;;
-         n) echo "not possible usage apt-fast" ; exit ;;
-    esac
+# Test if aria2 is installed
+if [ ! -x /usr/bin/aria2c ]; then
+  echo "aria2 is not installed, perform installation? (y/n)"
+  read -r ops
+  case ${ops,,} in
+  y) if apt-get install aria2 -y; then
+    echo "aria2 installed"
+  else
+    echo "Unable to install the aria2. Are you sudo?"
+    exit
+  fi ;;
+  n)
+    echo "Aborting script"
+    exit 1
+    ;;
+  esac
 fi
 
 # If the user entered arguments contain upgrade, install, or dist-upgrade
-if echo "$@" | grep -q "upgrade\|install\|dist-upgrade"; then
-  echo "Working...";
+if echo "$@" | grep -Eqw "(dist-)?upgrade|(re)?install"; then
+  echo "Working..."
 
   # Have apt-get print the information, including the URI's to the packages
-  # Strip out the URI's, and download the packages with aria2 for speediness
-  # I found this regex elsewhere, showing how to manually strip package URI's you may need...thanks to whoever wrote it
-  apt-get -y --print-uris $@ | grep -Po "(ht|f)tps?://[^\']+" > ${ARCHLIST} && aria2c -i ${ARCHLIST} -d ${ARCHDIR}
-
-  # Perform the user's requested action via apt-get
-  apt-get $@;
-
-  echo -e "\nDone! Verify that all packages were installed successfully. If errors are found, run apt-get clean as root and try again using apt-get directly.\n";
-
-else
-   apt-get $@;
+  apt-get -y --print-uris "$@" |
+    grep -Po "(ht|f)tps?://[^\']+" >${ARCHLIST} &&
+    aria2c -c -i ${ARCHLIST} -d ${ARCHDIR} ||
+    echo "No files to download"
 fi
+
+# Perform the user's requested action via apt-get
+apt-get "$@"
+
+echo -e "\nDone! Verify that all packages were installed successfully. If errors are found, run apt-get clean as root and try again using apt-get directly.\n"
+
 # Clean up
-apt-get clean
-rm ${ARCHLIST} 2>/dev/null || true
+apt clean

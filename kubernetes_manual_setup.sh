@@ -2,24 +2,24 @@
 set -eu
 
 if [ "$(id -u)" -ne 0 ]; then
-    echo "You need to run with sudo"
-    exit 1
+  echo "You need to run with sudo"
+  exit 1
 fi
 
 if ! grep -Ewq 'ID=(debian|ubuntu)' /etc/os-release; then
-    echo "This script is meant to be ran on Debian/Ubuntu based systems"
-    exit 1
+  echo "This script is meant to be ran on Debian/Ubuntu based systems"
+  exit 1
 fi
 
 if [ -f /run/.kube_setup ]; then
-    echo "Kubernetes components are already installed on this system"
-    exit 1
+  echo "Kubernetes components are already installed on this system"
+  exit 1
 fi
 
 apt-get update && apt-get install -y aria2 jq apt-transport-https curl
 
-curl -s https://pastebin.com/raw/v2BtJJC0 | tr -d '\r' >/usr/local/bin/apt-fast
-chmod +x /usr/local/bin/apt-fast
+curl -s https://raw.githubusercontent.com/Saichovsky/various_scripts/refs/heads/master/apt-fast \
+  -o /usr/local/bin/apt-fast && chmod +x /usr/local/bin/apt-fast
 
 # Set up containerd requirements
 cat <<-EOF >/etc/modules-load.d/containerd.conf
@@ -43,9 +43,9 @@ PLATFORM=$(arch | sed 's/aarch64/arm64/; s/x86_64/amd64/')
 CONTAINERD_VERSION=$(curl -s https://api.github.com/repos/containerd/containerd/releases/latest | jq -r '.tag_name')
 CONTAINERD_VERSION=${CONTAINERD_VERSION#v}
 curl -L "https://github.com/containerd/containerd/releases/download/v${CONTAINERD_VERSION}/containerd-${CONTAINERD_VERSION}-linux-${PLATFORM}.tar.gz" \
-    -o "containerd-${CONTAINERD_VERSION}-linux-${PLATFORM}.tar.gz"
+  -o "containerd-${CONTAINERD_VERSION}-linux-${PLATFORM}.tar.gz"
 tar xvf "containerd-${CONTAINERD_VERSION}-linux-${PLATFORM}.tar.gz" -C /usr/local &&
-    rm "containerd-${CONTAINERD_VERSION}-linux-${PLATFORM}.tar.gz"
+  rm "containerd-${CONTAINERD_VERSION}-linux-${PLATFORM}.tar.gz"
 
 # Configure containerd
 mkdir -p /etc/containerd
@@ -65,12 +65,12 @@ TOML
 echo -e "\nInstalling runc..."
 RUNC_VERSION=$(curl -s https://api.github.com/repos/opencontainers/runc/releases/latest | jq -r '.tag_name')
 curl -L "https://github.com/opencontainers/runc/releases/download/${RUNC_VERSION}/runc.${PLATFORM}" \
-    -o /usr/local/sbin/runc
+  -o /usr/local/sbin/runc
 chmod +x /usr/local/sbin/runc
 
 if [ -L /etc/apparmor.d/runc ]; then
-    ln -s /etc/apparmor.d/runc /etc/apparmor.d/disable/
-    apparmor_parser -R /etc/apparmor.d/runc
+  ln -s /etc/apparmor.d/runc /etc/apparmor.d/disable/
+  apparmor_parser -R /etc/apparmor.d/runc
 fi
 
 # Disable swap as kubelet doesn't like it
@@ -91,9 +91,9 @@ br_netfilter
 EOF
 
 curl -fsSL "https://pkgs.k8s.io/core:/stable:/${KUBEVERSION}/deb/Release.key" |
-    gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+  gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
 echo "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/${KUBEVERSION}/deb/ /" |
-    tee /etc/apt/sources.list.d/kubernetes.list
+  tee /etc/apt/sources.list.d/kubernetes.list
 
 apt-get update && apt-fast install -y kubelet kubeadm kubectl
 apt-mark hold kubelet kubeadm kubectl
@@ -102,7 +102,7 @@ crictl config --set runtime-endpoint=unix:///run/containerd/containerd.sock
 touch /run/.kube_setup
 
 echo "Installing k9s..."
-curl -s https://pastebin.com/raw/KsYgLfYw | tr -d '\r' | bash
+curl -s https://raw.githubusercontent.com/Saichovsky/various_scripts/refs/heads/master/k9s_updater.sh | bash
 echo "done."
 
 echo

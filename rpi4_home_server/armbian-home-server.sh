@@ -20,7 +20,7 @@ prechecks() {
   fi
 
   if [[ -r /etc/armbian-release ]]; then
-    . /etc/armbian-release
+    eval "$(grep -w ^BOARD /etc/armbian-release)"
   else
     echo "Could not read required release file"
     exit 1
@@ -31,15 +31,17 @@ prechecks() {
 prechecks
 
 # Install Apt-fast
-command -v apt-fast >/dev/null && RERUN=1 || {
-  curl -s https://pastebin.com/raw/v2BtJJC0 | tr -d '\r' >/usr/local/bin/apt-fast &&
-    chmod +x /usr/local/bin/apt-fast
-}
+if command -v apt-fast >/dev/null; then
+  RERUN=1
+else
+  curl -s https://raw.githubusercontent.com/Saichovsky/various_scripts/refs/heads/master/apt-fast \
+    -o /usr/local/bin/apt-fast && chmod +x /usr/local/bin/apt-fast
+fi
 
 # Install k9s
 [[ "$RERUN" == "1" ]] || {
-  curl -s https://pastebin.com/raw/KsYgLfYw | tr -d '\r' >/usr/local/bin/update_k9s &&
-    chmod +x /usr/local/bin/update_k9s
+  curl -s https://raw.githubusercontent.com/Saichovsky/various_scripts/refs/heads/master/k9s_updater.sh \
+    -o /usr/local/bin/update_k9s && chmod +x /usr/local/bin/update_k9s
 }
 update_k9s
 
@@ -52,7 +54,7 @@ update_k9s
   cat >"$OVERRIDE_FILE" <<EOF
 [Service]
 ExecStart=
-ExecStart=/bin/sh -c '/lib/systemd/systemd-networkd-wait-online --any'
+ExecStart=/lib/systemd/systemd-networkd-wait-online --any
 EOF
 
   systemctl daemon-reload
@@ -75,8 +77,8 @@ EOF
 # Update /etc/issue with the host IP for ease of identification for SSH access
 [ ! -f /usr/local/bin/update-issue.sh ] &&
   {
-    curl -s https://pastebin.com/raw/tEHerNef | tr -d '\r' >/usr/local/bin/update-issue.sh &&
-      chmod 755 /usr/local/bin/update-issue.sh
+    curl -s https://raw.githubusercontent.com/Saichovsky/various_scripts/refs/heads/master/rpi4_home_server/armbian-update-issue.sh \
+      -o /usr/local/bin/update-issue.sh && chmod 755 /usr/local/bin/update-issue.sh
 
     # Install update-issue script as a systemd service
     cat <<EOF >/etc/systemd/system/update-issue.service
@@ -108,7 +110,7 @@ KUBEVERSION=$(curl -s https://api.github.com/repos/kubernetes/kubernetes/release
 curl -fsSL "https://pkgs.k8s.io/core:/stable:/${KUBEVERSION}/deb/Release.key" | gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
 cat <<EOF >/etc/apt/sources.list.d/docker.list
 deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian \
-  $(. /etc/os-release && echo "$VERSION_CODENAME") stable
+  $(awk -F '=' '/^VERSION_CODENAME/ {print $2}' /etc/os-release) stable
 EOF
 chmod 644 /etc/apt/keyrings/kubernetes-apt-keyring.gpg
 cat <<EOF >/etc/apt/sources.list.d/kubernetes.list
@@ -118,7 +120,7 @@ chmod 644 /etc/apt/sources.list.d/{docker,kubernetes}.list
 apt-get update && apt-fast install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin kubectl
 
 # Install kubectx and kubens
-RELEASE_STRING="$(uname | tr 'A-Z' 'a-z')_$(arch | sed 's/aarch64/arm64/')"
+RELEASE_STRING="$(uname | tr '[:upper:]' '[:lower:]')_$(arch | sed 's/aarch64/arm64/')"
 curl -s 'https://api.github.com/repos/ahmetb/kubectx/releases/latest' |
   jq -r --arg rel "${RELEASE_STRING}" '.assets[].browser_download_url | select(contains($rel))' |
   aria2c --allow-overwrite=true -i-
@@ -134,7 +136,7 @@ curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
 
 # Install and set up kind
 echo "Installing kind..."
-RELEASE_STRING="$(uname | tr 'A-Z' 'a-z')-$(dpkg --print-architecture)"
+RELEASE_STRING="$(uname | tr '[:upper:]' '[:lower:]')-$(dpkg --print-architecture)"
 KIND_LATEST=$(curl -s 'https://api.github.com/repos/kubernetes-sigs/kind/releases/latest' | jq -r '.tag_name')
 KIND_LOCAL=/usr/local/bin/kind
 curl -Lo "${KIND_LOCAL}" "https://kind.sigs.k8s.io/dl/${KIND_LATEST}/kind-${RELEASE_STRING}"
