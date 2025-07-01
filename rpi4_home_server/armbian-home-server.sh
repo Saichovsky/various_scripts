@@ -45,7 +45,7 @@ fi
 }
 update_k9s
 
-# Fix broken systemd service
+# Force systemd to wait for connectivity on any interface
 [[ "$RERUN" == "1" ]] || {
   OVERRIDE_DIR="/etc/systemd/system/systemd-networkd-wait-online.service.d"
   OVERRIDE_FILE="$OVERRIDE_DIR/override.conf"
@@ -99,7 +99,7 @@ EOF
   }
 
 # Install required tools and packages
-yes | apt-fast install -y ca-certificates apt-transport-https gnupg git jq yq fzf
+yes | apt-fast install -y ca-certificates apt-transport-https gnupg git jq yq fzf avahi-daemon
 test -d /etc/apt/keyrings || install -m 0755 -d /etc/apt/keyrings
 [[ -f /etc/apt/keyrings/docker.asc ]] || {
   curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc
