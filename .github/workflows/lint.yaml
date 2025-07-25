@@ -12,6 +12,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
 
       - name: Install dependencies
         run: |
@@ -30,7 +32,7 @@ jobs:
           files=$(git diff --name-only origin/master...HEAD | 
             xargs -I{} sh -c 'head -n 1 "{}" 2>/dev/null |
             grep -qE "^#!.*\\b(sh|bash|zsh|ksh|dash)\\b" && 
-            echo "{}"' || true)
+            echo "{}"')
           echo "modified_files<<EOF" >> $GITHUB_OUTPUT
           echo "$files" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
