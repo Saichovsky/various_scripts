@@ -1,0 +1,46 @@
+name: Shell Script Lint and Format Check
+
+on:
+  pull_request:
+    paths:
+      - '**/*.sh'
+
+jobs:
+  lint-and-format:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y git shellcheck
+
+          # Install shfmt - no apt package in some Ubuntu versions, so install manually:
+          SHFMT_VERSION="v3.12.0"
+          curl -L "https://github.com/mvdan/sh/releases/download/${SHFMT_VERSION}/shfmt_${SHFMT_VERSION}_linux_$(dpkg --print-architecture)" \
+            -o /usr/local/bin/shfmt
+          sudo chmod +x /usr/local/bin/shfmt
+
+      - name: Get list of shell scripts modified in the last commit
+        id: files
+        run: |
+          files=$(git diff --name-only origin/master...HEAD | 
+            xargs -I{} sh -c 'head -n 1 "{}" 2>/dev/null |
+            grep -qE "^#!.*\\b(sh|bash|zsh|ksh|dash)\\b" && 
+            echo "{}"' || true)
+          echo "modified_files<<EOF" >> $GITHUB_OUTPUT
+          echo "$files" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Run ShellCheck on modified scripts
+        if: steps.files.outputs.modified_files != ''
+        run: |
+          echo "${{ steps.files.outputs.modified_files }}" | xargs -r shellcheck
+
+      - name: Run shfmt check on modified scripts
+        if: steps.files.outputs.modified_files != ''
+        run: |
+          echo "${{ steps.files.outputs.modified_files }}" | xargs -r shfmt -i 2 --diff --exit-code
