@@ -38,6 +38,9 @@ else
     -o /usr/local/bin/apt-fast && chmod +x /usr/local/bin/apt-fast
 fi
 
+# Set preferred apt repo
+sed -i "s_^URIs:.*\$_URIs: http://armbian.nardol.ovh/apt_" /etc/apt/sources.list.d/armbian.sources
+
 # Install k9s
 [[ "$RERUN" == "1" ]] || {
   curl -s https://raw.githubusercontent.com/Saichovsky/various_scripts/refs/heads/master/k9s_updater.sh \
@@ -65,59 +68,68 @@ EOF
 
 # Rename host
 [[ "$RERUN" == "1" ]] || {
-  OLD_HOSTNAME=$(hostname)
   NEW_HOSTNAME="home-server-$BOARD"
   hostnamectl set-hostname "$NEW_HOSTNAME"
-  sed -i "s/$OLD_HOSTNAME/$NEW_HOSTNAME/g" /etc/hosts
+  sed -i "s/^127.0.1.1.*$/127.0.1.1   $NEW_HOSTNAME/g" /etc/hosts
 }
 
+# Add Multicast DNS (mDNS) support for resolving .local domain
+sed -i 's/^hosts:.*/hosts:          files mymachines mdns4_minimal [NOTFOUND=return] dns myhostname/' /etc/nsswitch.conf
+
 # Enable NTP client
-[[ "$RERUN" == "1" ]] || sed -i 's/^#NTP=$/NTP=ke.pool.ntp.org/' /etc/systemd/timesyncd.conf
+if ! grep -q ke.pool.ntp.org /etc/systemd/timesync.conf; then
+  sed -i 's/^#NTP=$/NTP=ke.pool.ntp.org/' /etc/systemd/timesyncd.conf
+  systemctl restart systemd-timesyncd
+fi
 
-# Update /etc/issue with the host IP for ease of identification for SSH access
-[ ! -f /usr/local/bin/update-issue.sh ] &&
-  {
-    curl -s https://raw.githubusercontent.com/Saichovsky/various_scripts/refs/heads/master/rpi4_home_server/armbian-update-issue.sh \
-      -o /usr/local/bin/update-issue.sh && chmod 755 /usr/local/bin/update-issue.sh
+# Armbian seems to have added this feature to their releases by default
+# # Update /etc/issue with the host IP for ease of identification for SSH access
+# [ ! -f /usr/local/bin/update-issue.sh ] &&
+#   {
+#     curl -s https://raw.githubusercontent.com/Saichovsky/various_scripts/refs/heads/master/rpi4_home_server/armbian-update-issue.sh \
+#       -o /usr/local/bin/update-issue.sh && chmod 755 /usr/local/bin/update-issue.sh
 
-    # Install update-issue script as a systemd service
-    cat <<EOF >/etc/systemd/system/update-issue.service
-[Unit]
-Description=Update /etc/issue with host IP address
-After=network-online.target
-Wants=network-online.target
+#     # Install update-issue script as a systemd service
+#     cat <<EOF >/etc/systemd/system/update-issue.service
+# [Unit]
+# Description=Update /etc/issue with host IP address
+# After=network-online.target
+# Wants=network-online.target
 
-[Service]
-Type=oneshot
-ExecStart=/usr/local/bin/update-issue.sh
+# [Service]
+# Type=oneshot
+# ExecStart=/usr/local/bin/update-issue.sh
 
-[Install]
-WantedBy=multi-user.target
-EOF
+# [Install]
+# WantedBy=multi-user.target
+# EOF
 
-    systemctl enable update-issue
-  }
+#     systemctl enable update-issue
+#   }
 
 # Install required tools and packages
-yes | apt-fast install -y ca-certificates apt-transport-https gnupg git jq yq fzf avahi-daemon
 test -d /etc/apt/keyrings || install -m 0755 -d /etc/apt/keyrings
 [[ -f /etc/apt/keyrings/docker.asc ]] || {
   curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc
   chmod a+r /etc/apt/keyrings/docker.asc
 }
 
-KUBEVERSION=$(curl -s https://api.github.com/repos/kubernetes/kubernetes/releases/latest | jq -r '.tag_name | gsub("\\.[0-9]+$"; "")')
+KUBEVERSION=$(curl -s https://api.github.com/repos/kubernetes/kubernetes/releases/latest | sed -n 's/.*"tag_name": *"\([^"]*\)".*/\1/p')
 curl -fsSL "https://pkgs.k8s.io/core:/stable:/${KUBEVERSION}/deb/Release.key" | gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+
 cat <<EOF >/etc/apt/sources.list.d/docker.list
 deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian \
   $(awk -F '=' '/^VERSION_CODENAME/ {print $2}' /etc/os-release) stable
 EOF
-chmod 644 /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+
 cat <<EOF >/etc/apt/sources.list.d/kubernetes.list
 deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/${KUBEVERSION}/deb/ /
 EOF
-chmod 644 /etc/apt/sources.list.d/{docker,kubernetes}.list
-apt-get update && apt-fast install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin kubectl
+chmod 644 /etc/apt/sources.list.d/{docker,kubernetes}.list /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+
+apt-get update && apt-fast install -y \
+  ca-certificates apt-transport-https gnupg git jq yq fzf avahi-daemon \
+  docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin kubectl
 
 # Install kubectx and kubens
 RELEASE_STRING="$(uname | tr '[:upper:]' '[:lower:]')_$(arch | sed 's/aarch64/arm64/')"
@@ -187,18 +199,18 @@ spec:
       - matchExpressions:
         - key: node-role.kubernetes.io/control-plane
           operator: DoesNotExist
----
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: shared-pvc
-spec:
-  accessModes:
-    - ReadWriteMany
-  resources:
-    requests:
-      storage: 3Gi
-  storageClassName: shared-storage
+# ---
+# apiVersion: v1
+# kind: PersistentVolumeClaim
+# metadata:
+#   name: shared-pvc
+# spec:
+#   accessModes:
+#     - ReadWriteMany
+#   resources:
+#     requests:
+#       storage: 3Gi
+#   storageClassName: shared-storage
 EOF
 # Use helm to install home assistant and pi-hole
 # helm repo add home-assistant https://amcgeek.github.io/home-assistant-helm
